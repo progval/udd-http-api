@@ -204,9 +204,10 @@ class UddResource(object):
             finally:
                 cur.close()
 
-    def _fetch_linked(self, classes, relation_name):
-        query = 'SELECT blocked FROM %s_%s WHERE id=%%s;' % \
-                (self._table, relation_name)
+    def _fetch_linked(self, relation_name, field, classes=None):
+        objects = []
+        query = 'SELECT %s FROM %s_%s WHERE id=%%s;' % \
+                (field, self._table, relation_name)
         cur = self.cursor()
         try:
             cur.execute(query, [self.id])
@@ -214,13 +215,16 @@ class UddResource(object):
                 data = cur.fetchone()
                 if data is None:
                     break
-                bug = None
-                for cls in classes:
-                    try:
-                        bug = cls.fetch_database(pk=data[0])
-                    except ObjectNotFound as e:
-                        pass
-                if bug is None:
+                obj = None
+                if classes is None: # Native data
+                    obj = data[0]
+                else: # many-to-many relation
+                    for cls in classes:
+                        try:
+                            obj = cls.fetch_database(pk=data[0])
+                        except ObjectNotFound as e:
+                            pass
+                if obj is None:
                     raise CorruptedDatabase(('`%(obj)r` has relationship '
                             '`%(rel)s` with inexisting element: `%(pk)s`') % {
                                 'obj': self,
@@ -228,11 +232,10 @@ class UddResource(object):
                                 'pk': data[0],
                                 }
                             )
-                self._blocks.append(bug)
+                objects.append(obj)
         finally:
             cur.close()
-
-
+        return objects
 
 class AbstractBug(UddResource):
     """Base class for active and inactive bugs.
@@ -249,7 +252,8 @@ class AbstractBug(UddResource):
     def blocks(self):
         """Bugs this bug blocks."""
         if self._blocks is None:
-            self._blocks = self._fetch_linked([Bug, ArchivedBug], 'blocks')
+            self._blocks = self._fetch_linked('blocks', 'blocked',
+                    [ActiveBug, ArchivedBug])
         return self._blocks
 
     _blockedby = None
@@ -257,9 +261,34 @@ class AbstractBug(UddResource):
     def blockedby(self):
         """Bugs this bug blocks."""
         if self._blockedby is None:
-            self._blockedby = self._fetch_linked([Bug, ArchivedBug],
-                    'blockedby')
+            self._blockedby = self._fetch_linked('blockedby', 'blocker',
+                    [ActiveBug, ArchivedBug])
         return self._blockedby
+
+    _merged_with = None
+    @property
+    def merged_with(self):
+        """Bug that has been merge with this one."""
+        if self._merged_with is None:
+            self._merged_with = self._fetch_linked('merged_with',
+                    'merged_with', [ActiveBug, ArchivedBug])
+        return self._merged_with
+
+    _fixed_in = None
+    @property
+    def fixed_in(self):
+        """The version this bug has been fixed in."""
+        if self._fixed_in is None:
+            self._fixed_in = self._fetch_linked('fixed_in', 'version')
+        return self._fixed_in
+
+    _found_in = None
+    @property
+    def found_in(self):
+        """The version this bug has been found in."""
+        if self._found_in is None:
+            self._found_in = self._fetch_linked('found_in', 'version')
+        return self._found_in
 
 class ActiveBug(AbstractBug):
     """An active bug. See also :class:`uddlib.ArchivedBug`.
