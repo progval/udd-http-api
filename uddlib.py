@@ -40,9 +40,43 @@ class ObjectNotFound(UddException):
     """
     pass
 
+class CorruptedDatabase(UddException):
+    """Exception raised when the database is not consistant (wrong IDs in
+    many-to-many relations, bad type, no primary key, ...)
+    """
+    pass
+
+def data2object(cls, data):
+    """Shortcut for creating an object from database data.
+
+    :param cls: The class of the object
+    :param data: The data from the database
+    :returns: The created object
+    """
+    assert len(cls._fields) == len(data)
+    kwargs = dict(zip(cls._fields, data))
+    return cls(**kwargs)
+
 class UddResource(object):
     """Base class representing an entry in the database.
     """
+
+    _singleton = True
+    __instances = {}
+    def __new__(cls, **kwargs):
+        pk = kwargs[cls._fields[0]]
+        if not cls._singleton:
+            instance = object.__new__(cls)
+            instance._parameter = pk
+            return instance
+        if cls not in cls.__instances:
+            cls.__instances[cls] = {}
+        if pk not in cls.__instances[cls]:
+            instance = object.__new__(cls)
+            instance._parameter = pk
+            cls.__instances[cls][pk] = instance
+        return cls.__instances[cls][pk]
+
     def __init__(self, **kwargs):
         assert self._path is not None
         assert self._table is not None
@@ -121,10 +155,6 @@ class UddResource(object):
         assert cls.table is not None
         fields = fields or '*'
         query = 'SELECT %(fields)s FROM %(table)s %(where)s'
-        def data2object(data):
-            assert len(cls._fields) == len(data)
-            kwargs = dict(zip(cls._fields, data))
-            return cls(**kwargs)
 
         if pk is None:
             # TODO: rewrite this to make it less dependant on the order of
@@ -136,7 +166,7 @@ class UddResource(object):
 
             query %= {
                     'fields': fields,
-                    'table': cls.table,
+                    'table': cls._table,
                     'where': where_clause,
                     }
             logging.debug('query: ' + query)
@@ -146,10 +176,11 @@ class UddResource(object):
             try:
                 cur.execute(query, where_params)
 
-                for data in cur.fetchone():
-                    assert len(cls.fields) == len(data)
-                    kwargs = dict(zip(cls.fields, data))
-                    objects.append(data2object(data))
+                while True:
+                    data = cur.fetchone()
+                    if data is None:
+                        break
+                    objects.append(data2object(cls, data))
             finally:
                 cur.close()
 
@@ -163,20 +194,88 @@ class UddResource(object):
             logging.debug('query: ' + query)
             
             cur = cls.cursor() # __exit__ not implemented in psycopg2
-            cur.execute(query, [pk])
             try:
+                cur.execute(query, [pk])
                 data = cur.fetchone()
                 if data is None:
                     raise ObjectNotFound()
                 else:
-                    return data2object(data)
-            except psycopg2.ProgrammingError:
-                raise ObjectNotFound()
+                    return data2object(cls, data)
             finally:
                 cur.close()
 
+    def _fetch_linked(self, classes, relation_name):
+        query = 'SELECT blocked FROM %s_%s WHERE id=%%s;' % \
+                (self._table, relation_name)
+        cur = self.cursor()
+        try:
+            cur.execute(query, [self.id])
+            while True:
+                data = cur.fetchone()
+                if data is None:
+                    break
+                bug = None
+                for cls in classes:
+                    try:
+                        bug = cls.fetch_database(pk=data[0])
+                    except ObjectNotFound as e:
+                        pass
+                if bug is None:
+                    raise CorruptedDatabase(('`%(obj)r` has relationship '
+                            '`%(rel)s` with inexisting element: `%(pk)s`') % {
+                                'obj': self,
+                                'rel': relation_name,
+                                'pk': data[0],
+                                }
+                            )
+                self._blocks.append(bug)
+        finally:
+            cur.close()
+
+
+
+class AbstractBug(UddResource):
+    """Base class for active and inactive bugs.
+    """
+    _fields = ['id', 'package', 'source', 'arrival', 'status', 'severity',
+    'submitter', 'owner', 'done', 'title', 'last_modified', 'forwarded',
+    'affects_stable', 'affects_testing', 'affects_unstable',
+    'affects_experimental', 'submitter_name', 'submitter_email', 'owner_name',
+    'owner_email', 'done_name', 'done_email', 'affects_oldstable',
+    'done_date']
+
+    _blocks = None
+    @property
+    def blocks(self):
+        """Bugs this bug blocks."""
+        if self._blocks is None:
+            self._blocks = self._fetch_linked([Bug, ArchivedBug], 'blocks')
+        return self._blocks
+
+    _blockedby = None
+    @property
+    def blockedby(self):
+        """Bugs this bug blocks."""
+        if self._blockedby is None:
+            self._blockedby = self._fetch_linked([Bug, ArchivedBug],
+                    'blockedby')
+        return self._blockedby
+
+class ActiveBug(AbstractBug):
+    """An active bug. See also :class:`uddlib.ArchivedBug`.
+    """
+    _path = 'bugs'
+    _table = 'bugs'
+
+class ArchivedBug(AbstractBug):
+    """An archived bug. See also :class:`uddlib.ActiveBug`.
+    """
+    _path = 'archived_bugs'
+    _table = 'archived_bugs'
+
 
 class Popcon(UddResource):
+    """Popularity contest."""
     _path = 'popcon'
     _table = 'popcon'
     _fields = ['package', 'insts', 'vote', 'olde', 'recent', 'nofiles']
