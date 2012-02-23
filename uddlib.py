@@ -486,3 +486,11 @@ class Popcon(UddResource):
     _path = 'popcon'
     _table = 'popcon'
     _fields = ['package', 'insts', 'vote', 'olde', 'recent', 'nofiles']
+
+class PopconSrc(Popcon):
+    _path = 'popcon_src'
+    _table = 'popcon_src'
+
+class PopconSrcAverage(Popcon):
+    _path = 'popcon_src_average'
+    _table = 'popcon_src_average'

@@ -64,5 +64,9 @@ class UddlibTestCase(unittest.TestCase):
         self.failUnless(any([x.architecture=='i386' for x in pkg.subpackages]))
         self.failUnless(any([x.architecture=='ia64' for x in pkg.subpackages]))
 
+    def testPopcon(self):
+        popcon = uddlib.Popcon.fetch_database()
+        self.failUnless(any([x.package=='python2.7' for x in popcon]))
+
 if __name__ == '__main__':
     unittest.main()
