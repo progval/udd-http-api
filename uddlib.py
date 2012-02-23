@@ -30,7 +30,7 @@ class UddException(Exception):
     """
     pass
 
-class RessourceNotFound(UddException):
+class ResourceNotFound(UddException):
     """Exception raised when resolving to a resource has no result.
     May happen when resolve_path is called with an invalid path.
     """
@@ -97,7 +97,7 @@ class UddResource(object):
     def __repr__(self):
         return '%s.%s(%s)' % (self.__class__.__module__,
                 self.__class__.__name__,
-                ', '.join(['%s=%r'%x for x in zip(self._pk, self._parameter)]))
+                ', '.join(['%s=%r'%x for x in zip(self.pk, self._parameter)]))
 
     def __eq__(self, other):
         return self._data == other._data
@@ -147,13 +147,13 @@ class UddResource(object):
         :return: an UddResource subclass, serving this path.
         :raises ResourceNotFound: if the path cannot be resolved.
         """
-        for subclass in cls.__subclasses__:
+        for subclass in cls.__subclasses__():
             if subclass.path == path:
                 return subclass
         raise ResourceNotFound()
     
     @classmethod
-    def fetch_database(cls, pk=None, fields=None, **kwargs):
+    def fetch_database(cls, pk=None, fields=None, _table=None, **kwargs):
         """Returns all objects of this resource matching the criterions.
 
         :param pk: The primary key. If this parameter is given, an instance of
@@ -170,7 +170,25 @@ class UddResource(object):
         :raises ObjectNotFound: if pk is given and no objects have this
                                 primary key.
         """
-        assert cls.table is not None
+        table = _table or cls._table
+        if isinstance(table, tuple):
+            if pk is None:
+                results = []
+                for table in table:
+                    try:
+                        results.extend(cls.fetch_database(pk, fields, table,
+                            **kwargs))
+                    except ObjectNotFound:
+                        pass
+                return results
+            else:
+                for table in table:
+                    try:
+                        return cls.fetch_database(pk, fields, table,
+                            **kwargs)
+                    except ObjectNotFound:
+                        pass
+            return results
         fields = fields or '*'
         query = 'SELECT %(fields)s FROM %(table)s %(where)s'
 
@@ -184,7 +202,7 @@ class UddResource(object):
 
             query %= {
                     'fields': fields,
-                    'table': cls._table,
+                    'table': table,
                     'where': where_clause,
                     }
             logging.debug('query: ' + query)
@@ -206,7 +224,7 @@ class UddResource(object):
         else:
             query %= {
                     'fields': fields,
-                    'table': cls._table,
+                    'table': table,
                     'where': 'WHERE ' + cls._fields[0] + ' = %s',
                     }
             logging.debug('query: ' + query)
@@ -251,7 +269,13 @@ class UddResource(object):
         """
         if base_table_name is None:
             base_table_name = self._table
-        multiple_fields = isinstance(field, list) or isinstance(field, tuple)
+        if isinstance(base_table_name, tuple):
+            results = []
+            for table in base_table_name:
+                results.extend(self._fetch_linked(relation_name, field,
+                        classes, table))
+            return results
+        multiple_fields = isinstance(field, tuple)
         if multiple_fields:
             field = ', '.join(field)
         objects = []
@@ -292,7 +316,7 @@ class UddResource(object):
             cur.close()
         return objects
 
-class AbstractBug(UddResource):
+class Bug(UddResource):
     """Base class for active and inactive bugs.
     """
     _fields = ('id', 'package', 'source', 'arrival', 'status', 'severity',
@@ -302,13 +326,15 @@ class AbstractBug(UddResource):
     'owner_email', 'done_name', 'done_email', 'affects_oldstable',
     'done_date')
 
+    _path = 'bugs'
+    _table = ('bugs', 'archived_bugs')
+
     _blocks = None
     @property
     def blocks(self):
         """Bugs this bug blocks."""
         if self._blocks is None:
-            self._blocks = self._fetch_linked('blocks', 'blocked',
-                    [ActiveBug, ArchivedBug])
+            self._blocks = self._fetch_linked('blocks', 'blocked', (Bug,))
         return self._blocks
 
     _blockedby = None
@@ -316,8 +342,7 @@ class AbstractBug(UddResource):
     def blockedby(self):
         """Bugs this bug blocks."""
         if self._blockedby is None:
-            self._blockedby = self._fetch_linked('blockedby', 'blocker',
-                    [ActiveBug, ArchivedBug])
+            self._blockedby = self._fetch_linked('blockedby', 'blocker', (Bug,))
         return self._blockedby
 
     _merged_with = None
@@ -326,7 +351,7 @@ class AbstractBug(UddResource):
         """Bug that has been merge with this one."""
         if self._merged_with is None:
             self._merged_with = self._fetch_linked('merged_with',
-                    'merged_with', [ActiveBug, ArchivedBug])
+                    'merged_with', (Bug,))
         return self._merged_with
 
     _fixed_in = None
@@ -363,18 +388,6 @@ class AbstractBug(UddResource):
             self._packages = self._fetch_linked('packages',
                     ('package', 'source'))
         return self._packages
-
-class ActiveBug(AbstractBug):
-    """An active bug. See also :class:`uddlib.ArchivedBug`.
-    """
-    _path = 'bugs'
-    _table = 'bugs'
-
-class ArchivedBug(AbstractBug):
-    """An archived bug. See also :class:`uddlib.ActiveBug`.
-    """
-    _path = 'archived_bugs'
-    _table = 'archived_bugs'
 
 
 class Developper(UddResource):

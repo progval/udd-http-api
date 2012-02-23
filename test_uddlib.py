@@ -36,14 +36,14 @@ uddlib.connection = connection
 
 class UddlibTestCase(unittest.TestCase):
     def testBug(self):
-        bug = uddlib.ArchivedBug.fetch_database(pk=100000)
+        bug = uddlib.Bug.fetch_database(pk=100000)
         self.assertEqual(bug.title, 'xlibs: [xkb] Another alt keys not -> '
                                     'meta keysyms report')
         self.assertIn(77039, [x.id for x in bug.merged_with])
 
-        bug = uddlib.ActiveBug.fetch_database(pk=24043)
+        bug = uddlib.Bug.fetch_database(pk=24043)
         self.assertIn(638791, [x.id for x in bug.blocks])
-        bug2 = uddlib.ActiveBug.fetch_database(pk=638791)
+        bug2 = uddlib.Bug.fetch_database(pk=638791)
         self.assertIn(bug2, bug.blocks)
         self.assertIn(bug, bug2.blockedby)
 
