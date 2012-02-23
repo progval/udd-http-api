@@ -108,12 +108,13 @@ class UddResource(object):
     _path = None # string
     _table = None # string
     _fields = None # tuple
+    _calculated_fields = tuple()
 
     @property
     def pk(self):
         """The primary key of this resource.
         """
-        return self._pk or [self._fields[0]]
+        return self._pk or (self._fields[0],)
 
     @property
     def path(self):
@@ -128,6 +129,13 @@ class UddResource(object):
         """
         # We use a property to make this read-only.
         return self._table
+
+    @property
+    def data(self):
+        """The data of this object.
+        """
+        return dict(self._data.items() + [(x, getattr(self, x))
+            for x in self._calculated_fields])
 
     @staticmethod
     def cursor():
@@ -148,7 +156,7 @@ class UddResource(object):
         :raises ResourceNotFound: if the path cannot be resolved.
         """
         for subclass in cls.__subclasses__():
-            if subclass.path == path:
+            if subclass._path == path:
                 return subclass
         raise ResourceNotFound()
     
@@ -180,7 +188,6 @@ class UddResource(object):
                             **kwargs))
                     except ObjectNotFound:
                         pass
-                return results
             else:
                 for table in table:
                     try:
@@ -325,6 +332,8 @@ class Bug(UddResource):
     'affects_experimental', 'submitter_name', 'submitter_email', 'owner_name',
     'owner_email', 'done_name', 'done_email', 'affects_oldstable',
     'done_date')
+    _calculated_fields = ('blocks', 'blockedby', 'merged_with', 'fixed_in',
+    'found_in', 'tags', 'packages')
 
     _path = 'bugs'
     _table = ('bugs', 'archived_bugs')
@@ -375,7 +384,7 @@ class Bug(UddResource):
     def tags(self):
         """The version this bug has been found in."""
         if self._tags is None:
-            self._tags = self._fetch_linked('tags', 'version')
+            self._tags = self._fetch_linked('tags', 'tag')
         return self._tags
 
     _packages = None
@@ -396,6 +405,7 @@ class Developper(UddResource):
     _path = 'developpers'
     _table = 'carnivore_login'
     _fields = ('id', 'login')
+    _calculated_fields = ('emails', 'keys', 'names')
 
     _emails = None
     @property
@@ -426,10 +436,12 @@ class Developper(UddResource):
         return self._names
 
 
-class Package(object):
+class Package(UddResource):
     """A Debian package.
     """
     _path = 'packages'
+    _fields = ('package',)
+    _calculated_fields = ('subpackages',)
 
     def __init__(self, package):
         self._data = {'package': package}
@@ -480,7 +492,7 @@ class SubPackage(UddResource):
     """
     _pk = ('package', 'version', 'architecture', 'distribution', 'release',
             'component')
-    _path = 'subpackage'
+    _path = 'subpackages'
     _table = 'packages'
     _fields = ('package', 'version', 'architecture', 'maintainer',
             'maintainer_name', 'maintainer_email', 'description',
