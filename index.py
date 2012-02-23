@@ -46,6 +46,7 @@ def dthandler(obj):
         # computation.
     else:
         return None
+        # Perform standart serialization
 
 def serialize(data):
     return json.dumps(data, sort_keys=True, indent=4, default=dthandler)
@@ -72,7 +73,10 @@ def application(environ, start_response):
     if len(url) == 1: # Return a list of objects
         filters = urlparse.parse_qs(environ['QUERY_STRING'])
         assert all([(x in cls._fields) for x in filters])
+
+        # We want {'key': 'value'} and not {'key': ['value']}
         filters = dict([(x,y[0]) for x,y in filters.items()])
+        
         obj = cls.fetch_database(**filters)
         start_response('200 OK', [('Content-type', 'application/json')])
         if isinstance(obj, list):

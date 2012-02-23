@@ -66,6 +66,7 @@ class UddResource(object):
     _singleton = True
     __instances = {}
     def __new__(cls, **kwargs):
+        # This implements the Parametric Singleton design pattern.
         pk = cls._pk or (cls._fields[0],)
         id = tuple(kwargs[x] for x in pk)
         if not cls._singleton:
