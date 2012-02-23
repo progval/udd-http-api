@@ -206,13 +206,41 @@ class UddResource(object):
             finally:
                 cur.close()
 
-    def _fetch_linked(self, relation_name, field, classes=None):
+    def _fetch_linked(self, relation_name, field, classes=None,
+            base_table_name=None):
+        """Fetch a linked object.
+
+        :param relation_name: The identifier of the relation. For example, for
+                              table `bugs_fixed_in`, `fixed_in` is the
+                              name of the relation
+        :type relation_name: string
+        :param field: The name of the field we want to retrieve. If it is a
+                      string, a single object will be returned. If it is
+                      a tuple, a tuple will be returned.
+        :type field:  string or list of strings
+        :param classes: The class or the list of classes representing the
+                        resource we want to fetch. If it is a list, they
+                        will be tryed in the given order, and the first that
+                        can be used will be used (useful for search both
+                        in `bugs` and `archived_bugs`.
+        :type classes:  class or list of classes or None
+        :param base_table_name: The base name of the tables involved in the
+                                relation. For example, for table
+                                `bugs` it is `bugs`, and for
+                                `carnivor_login` it is `carnivor`.
+
+                                It defaults to the table represented by this
+                                class.
+        :type base_table_name:  string or None
+        """
+        if base_table_name is None:
+            base_table_name = self._table
         multiple_fields = isinstance(field, list) or isinstance(field, tuple)
         if multiple_fields:
             field = ', '.join(field)
         objects = []
         query = 'SELECT %s FROM %s_%s WHERE id=%%s;' % \
-                (field, self._table, relation_name)
+                (field, base_table_name, relation_name)
         cur = self.cursor()
         try:
             cur.execute(query, [self.id])
@@ -331,6 +359,42 @@ class ArchivedBug(AbstractBug):
     """
     _path = 'archived_bugs'
     _table = 'archived_bugs'
+
+
+class Developper(UddResource):
+    """A Debian Developper, from the Carnivore database.
+    """
+    _path = 'developpers'
+    _table = 'carnivore_login'
+    _fields = ['id', 'login']
+
+    _emails = None
+    @property
+    def emails(self):
+        """The email addresses of this developper."""
+        if self._emails is None:
+            self._emails = self._fetch_linked('emails', 'email',
+                    base_table_name='carnivore')
+        return self._emails
+
+    _keys = None
+    @property
+    def keys(self):
+        """The key of this developper.
+        A list of tuples (key, key_type)."""
+        if self._keys is None:
+            self._keys = self._fetch_linked('keys', ('key', 'key_type'),
+                    base_table_name='carnivore')
+        return self._keys
+
+    _names = None
+    @property
+    def names(self):
+        """The names of this developper."""
+        if self._names is None:
+            self._names = self._fetch_linked('names', 'name',
+                    base_table_name='carnivore')
+        return self._names
 
 
 class Popcon(UddResource):
