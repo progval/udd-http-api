@@ -1,0 +1,55 @@
+Introduction
+===========
+
+A web API for the Ultimate Debian Database.
+
+This API is read-only.
+
+Installation
+============
+
+Copy the file, create a file config.py with the following constants, and start
+the web server:
+* HOST
+* PORT
+* USER
+* PASSWORD
+* DATABASE
+
+URL schema
+==========
+
+The root gives the list of available subdirectories.
+
+You can provide filters (by appending ?filter1=value1&filter2=value2) to the
+URL. filter1 and filter2 are names of fields of the resources.
+Giving the same filter twice will be ignored.
+
+Format
+======
+
+All errors are plain text (text/plain). All data are json (application/json).
+
+Sample Apache configuration
+===========================
+
+    <VirtualHost 0.0.0.0:80>
+        ServerName udd.progval.net
+
+        DocumentRoot /home/udd/udd-http-api
+        <Directory "/home/udd/udd-http-api">
+            Options Indexes MultiViews FollowSymLinks +ExecCGI
+            Order allow,deny
+            Allow from all
+        </Directory>
+        <Location />
+            Options Indexes MultiViews FollowSymLinks +ExecCGI
+            SetHandler wsgi-script
+            Order allow,deny
+            Allow from all
+        </Location>
+        ErrorLog /home/udd/apache/error.log
+        WSGIScriptAlias / /home/udd/udd-http-api/index.py
+        AssignUserId udd udd
+    </VirtualHost>
+
