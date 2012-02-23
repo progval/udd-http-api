@@ -93,7 +93,7 @@ class UddResource(object):
         elif name in self._fields:
             return self._data[name]
         else:
-            raise AttributeError
+            raise AttributeError(name)
 
     def __repr__(self):
         return '%s.%s(%s)' % (self.__class__.__module__,
@@ -249,7 +249,7 @@ class UddResource(object):
                 cur.close()
 
     def _fetch_linked(self, relation_name, field, classes=None,
-            base_table_name=None):
+            base_table_name=None, exclude_from_pk=tuple()):
         """Fetch a linked object.
 
         :param relation_name: The identifier of the relation. For example, for
@@ -268,15 +268,17 @@ class UddResource(object):
         :type classes:  class or list of classes or None
         :param base_table_name: The base name of the tables involved in the
                                 relation. For example, for table
-                                `bugs` it is `bugs`, and for
-                                `carnivor_login` it is `carnivor`.
+                                `bugs` it is `bugs_`, and for
+                                `carnivor_login` it is `carnivor_`.
 
                                 It defaults to the table represented by this
                                 class.
         :type base_table_name:  string or None
+        :param exclude_from_pk: fields that will not be used as primary key.
+        :type exclude_from_pl: tuple
         """
         if base_table_name is None:
-            base_table_name = self._table
+            base_table_name = tuple([x + '_' for x in self._table])
         if isinstance(base_table_name, tuple):
             results = []
             for table in base_table_name:
@@ -287,11 +289,15 @@ class UddResource(object):
         if multiple_fields:
             field = ', '.join(field)
         objects = []
-        query = 'SELECT %s FROM %s_%s WHERE id=%%s;' % \
-                (field, base_table_name, relation_name)
+        query = 'SELECT %s FROM %s%s WHERE %s;' % \
+                (field, base_table_name, relation_name,
+                        ' AND '.join([(x + '=%s') for x in self._pk
+                            if x not in exclude_from_pk]))
         cur = self.cursor()
         try:
-            cur.execute(query, [self.id])
+            parameter = [y for x,y in zip(self._pk, self._parameter)
+                    if x not in exclude_from_pk]
+            cur.execute(query, parameter)
             while True:
                 data = cur.fetchone()
                 if data is None:
@@ -414,7 +420,7 @@ class Developper(UddResource):
         """The email addresses of this developper."""
         if self._emails is None:
             self._emails = self._fetch_linked('emails', 'email',
-                    base_table_name='carnivore')
+                    base_table_name='carnivore_')
         return self._emails
 
     _keys = None
@@ -424,16 +430,17 @@ class Developper(UddResource):
         A list of tuples (key, key_type)."""
         if self._keys is None:
             self._keys = self._fetch_linked('keys', ('key', 'key_type'),
-                    base_table_name='carnivore')
+                    base_table_name='carnivore_')
         return self._keys
 
     _names = None
     @property
     def names(self):
-        """The names of this developper."""
+        """The names of this developper.
+        """
         if self._names is None:
             self._names = self._fetch_linked('names', 'name',
-                    base_table_name='carnivore')
+                    base_table_name='carnivore_')
         return self._names
 
 
@@ -505,6 +512,20 @@ class SubPackage(UddResource):
             'python_version', 'provides', 'conflicts', 'sha256',
             'original_maintainer', 'distribution', 'release', 'component',
             'ruby_versions')
+    _computed_fields = ('descriptions',)
+
+    _descriptions = None
+    @property
+    def descriptions(self):
+        """Descriptions of the package in multiple languages.
+        """
+        if self._descriptions is None:
+            descriptions = self._fetch_linked('', 
+                    ('language', 'description', 'long_description', 'md5sum'),
+                    base_table_name='ddtp', exclude_from_pk=('architecture',))
+            self._descriptions = dict([(x[0], x[1:]) for x in descriptions])
+        return self._descriptions
+
 
 
 class Popcon(UddResource):
