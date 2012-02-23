@@ -18,6 +18,8 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+"""Object wrapper of the Ultimate Debian Database."""
+
 import logging
 import psycopg2
 
@@ -205,6 +207,9 @@ class UddResource(object):
                 cur.close()
 
     def _fetch_linked(self, relation_name, field, classes=None):
+        multiple_fields = isinstance(field, list) or isinstance(field, tuple)
+        if multiple_fields:
+            field = ', '.join(field)
         objects = []
         query = 'SELECT %s FROM %s_%s WHERE id=%%s;' % \
                 (field, self._table, relation_name)
@@ -217,11 +222,17 @@ class UddResource(object):
                     break
                 obj = None
                 if classes is None: # Native data
-                    obj = data[0]
+                    if multiple_fields:
+                        obj = data
+                    else:
+                        obj = data[0]
                 else: # many-to-many relation
                     for cls in classes:
                         try:
-                            obj = cls.fetch_database(pk=data[0])
+                            if multiple_fields:
+                                obj = [cls.fetch_database(pk=x) for x in data]
+                            else:
+                                obj = cls.fetch_database(pk=data[0])
                         except ObjectNotFound as e:
                             pass
                 if obj is None:
@@ -289,6 +300,25 @@ class AbstractBug(UddResource):
         if self._found_in is None:
             self._found_in = self._fetch_linked('found_in', 'version')
         return self._found_in
+
+    _tags = None
+    @property
+    def tags(self):
+        """The version this bug has been found in."""
+        if self._tags is None:
+            self._tags = self._fetch_linked('tags', 'version')
+        return self._tags
+
+    _packages = None
+    @property
+    def packages(self):
+        """The version this bug has been found in.
+        This property is a list of tuples (binary, source), where the source
+        package may be None."""
+        if self._packages is None:
+            self._packages = self._fetch_linked('packages',
+                    ('package', 'source'))
+        return self._packages
 
 class ActiveBug(AbstractBug):
     """An active bug. See also :class:`uddlib.ArchivedBug`.
