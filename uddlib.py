@@ -523,7 +523,10 @@ class SubPackage(UddResource):
             descriptions = self._fetch_linked('', 
                     ('language', 'description', 'long_description', 'md5sum'),
                     base_table_name='ddtp', exclude_from_pk=('architecture',))
-            self._descriptions = dict([(x[0], x[1:]) for x in descriptions])
+            self._descriptions = dict([(x[0], {'description': x[1],
+                                               'long_description': x[2],
+                                               'md5sum': x[3]},
+                                       ) for x in descriptions])
         return self._descriptions
 
 
