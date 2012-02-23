@@ -66,18 +66,19 @@ class UddResource(object):
     _singleton = True
     __instances = {}
     def __new__(cls, **kwargs):
-        pk = kwargs[cls._fields[0]]
+        pk = cls._pk or (cls._fields[0],)
+        id = tuple(kwargs[x] for x in pk)
         if not cls._singleton:
             instance = object.__new__(cls)
-            instance._parameter = pk
+            instance._parameter = id
             return instance
         if cls not in cls.__instances:
             cls.__instances[cls] = {}
-        if pk not in cls.__instances[cls]:
+        if id not in cls.__instances[cls]:
             instance = object.__new__(cls)
-            instance._parameter = pk
-            cls.__instances[cls][pk] = instance
-        return cls.__instances[cls][pk]
+            instance._parameter = id
+            cls.__instances[cls][id] = instance
+        return cls.__instances[cls][id]
 
     def __init__(self, **kwargs):
         assert self._path is not None
@@ -92,12 +93,27 @@ class UddResource(object):
             return self._data[name]
         else:
             raise AttributeError
+
+    def __repr__(self):
+        return '%s.%s(%s)' % (self.__class__.__module__,
+                self.__class__.__name__,
+                ', '.join(['%s=%r'%x for x in zip(self._pk, self._parameter)]))
+
+    def __eq__(self, other):
+        return self._data == other._data
         
 
     # This attributes should be read-only, and set by all subclasses.
+    _pk = None # tuple or None
     _path = None # string
     _table = None # string
-    _fields = None # list
+    _fields = None # tuple
+
+    @property
+    def pk(self):
+        """The primary key of this resource.
+        """
+        return self._pk or [self._fields[0]]
 
     @property
     def path(self):
@@ -279,12 +295,12 @@ class UddResource(object):
 class AbstractBug(UddResource):
     """Base class for active and inactive bugs.
     """
-    _fields = ['id', 'package', 'source', 'arrival', 'status', 'severity',
+    _fields = ('id', 'package', 'source', 'arrival', 'status', 'severity',
     'submitter', 'owner', 'done', 'title', 'last_modified', 'forwarded',
     'affects_stable', 'affects_testing', 'affects_unstable',
     'affects_experimental', 'submitter_name', 'submitter_email', 'owner_name',
     'owner_email', 'done_name', 'done_email', 'affects_oldstable',
-    'done_date']
+    'done_date')
 
     _blocks = None
     @property
@@ -366,7 +382,7 @@ class Developper(UddResource):
     """
     _path = 'developpers'
     _table = 'carnivore_login'
-    _fields = ['id', 'login']
+    _fields = ('id', 'login')
 
     _emails = None
     @property
@@ -395,6 +411,74 @@ class Developper(UddResource):
             self._names = self._fetch_linked('names', 'name',
                     base_table_name='carnivore')
         return self._names
+
+
+class Package(object):
+    """A Debian package.
+    """
+    _path = 'packages'
+
+    def __init__(self, package):
+        self._data = {'package': package}
+
+    @classmethod
+    def fetch_database(cls, pk=None, package=None):
+        query = 'SELECT DISTINCT(package) AS package FROM packages'
+        pk = pk or package
+        if pk is not None:
+            query += ' WHERE package=%s'
+        cur = UddResource.cursor()
+        try:
+            logging.debug('query: ' + query)
+            cur.execute(query, (pk,))
+            if pk is None:
+                return [Package(package=x) for x in cur.fetchall()]
+            else:
+                obj = cur.fetchone()
+                if obj is None:
+                    raise ObjectNotFound()
+                else:
+                    return Package(package=pk)
+        finally:
+            cur.close()
+
+    @property
+    def name(self):
+        return self._data['package']
+
+    def get_subpackages(self, **kwargs):
+        """Get all subpackages matching the criterions.
+        """
+        assert 'package' not in kwargs # It would not make any sense.
+        return SubPackage.fetch_database(package=self.name, **kwargs)
+
+    @property
+    def subpackages(self):
+        """Alias for :method:`uddlib.Package.get_subpackages`()
+        """
+        return self.get_subpackages()
+
+    # TODO: write some properties to provide easy access to data (versions,
+    # maintainers, ...)
+
+class SubPackage(UddResource):
+    """Represents a package, in a given version, architecure, distribution,
+    release, and component.
+    """
+    _pk = ('package', 'version', 'architecture', 'distribution', 'release',
+            'component')
+    _path = 'subpackage'
+    _table = 'packages'
+    _fields = ('package', 'version', 'architecture', 'maintainer',
+            'maintainer_name', 'maintainer_email', 'description',
+            'long_description', 'source', 'source_version',
+            'essential', 'depends', 'recommends', 'suggests', 'enhances',
+            'pre_depends', 'breaks', 'installed_size', 'homepage',
+            'size', 'build_essential', 'origin', 'sha1', 'replaces',
+            'section', 'md5sum', 'bugs', 'priority', 'tag', 'task',
+            'python_version', 'provides', 'conflicts', 'sha256',
+            'original_maintainer', 'distribution', 'release', 'component',
+            'ruby_versions')
 
 
 class Popcon(UddResource):

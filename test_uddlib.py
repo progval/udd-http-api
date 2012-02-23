@@ -58,5 +58,11 @@ class UddlibTestCase(unittest.TestCase):
         self.assertEqual(len(devs), 1)
         self.assertEqual(dev, devs[0])
 
+    def testPackage(self):
+        pkg = uddlib.Package.fetch_database(package='python2.7')
+        self.failUnless(all([x.package=='python2.7' for x in pkg.subpackages]))
+        self.failUnless(any([x.architecture=='i386' for x in pkg.subpackages]))
+        self.failUnless(any([x.architecture=='ia64' for x in pkg.subpackages]))
+
 if __name__ == '__main__':
     unittest.main()
