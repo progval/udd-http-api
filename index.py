@@ -42,7 +42,7 @@ def dthandler(obj):
         return obj.isoformat()
     elif isinstance(obj, uddlib.UddResource):
         return dict(zip(obj.pk, obj._parameter))
-        # Not obj.data, because calculated_fields would result in circular
+        # Not obj.data, because computed_fields would result in circular
         # computation.
     else:
         return None

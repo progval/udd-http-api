@@ -109,7 +109,7 @@ class UddResource(object):
     _path = None # string
     _table = None # string
     _fields = None # tuple
-    _calculated_fields = tuple()
+    _computed_fields = tuple()
 
     @property
     def pk(self):
@@ -136,7 +136,7 @@ class UddResource(object):
         """The data of this object.
         """
         return dict(self._data.items() + [(x, getattr(self, x))
-            for x in self._calculated_fields])
+            for x in self._computed_fields])
 
     @staticmethod
     def cursor():
@@ -333,7 +333,7 @@ class Bug(UddResource):
     'affects_experimental', 'submitter_name', 'submitter_email', 'owner_name',
     'owner_email', 'done_name', 'done_email', 'affects_oldstable',
     'done_date')
-    _calculated_fields = ('blocks', 'blockedby', 'merged_with', 'fixed_in',
+    _computed_fields = ('blocks', 'blockedby', 'merged_with', 'fixed_in',
     'found_in', 'tags', 'packages')
 
     _path = 'bugs'
@@ -406,7 +406,7 @@ class Developper(UddResource):
     _path = 'developpers'
     _table = 'carnivore_login'
     _fields = ('id', 'login')
-    _calculated_fields = ('emails', 'keys', 'names')
+    _computed_fields = ('emails', 'keys', 'names')
 
     _emails = None
     @property
@@ -442,7 +442,7 @@ class Package(UddResource):
     """
     _path = 'packages'
     _fields = ('package',)
-    _calculated_fields = ('subpackages',)
+    _computed_fields = ('subpackages',)
 
     def __init__(self, package):
         self._data = {'package': package}
