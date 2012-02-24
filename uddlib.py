@@ -473,8 +473,9 @@ class Package(UddResource):
     DISTINCT(package) from the subpackages list. 
     """
     _path = 'packages'
+    _pk = ('package',)
     _fields = ('package',)
-    _computed_fields = ('subpackages',)
+    _computed_fields = ('subpackages', 'tags',)
 
     def __init__(self, package):
         self._data = {'package': package}
@@ -503,6 +504,16 @@ class Package(UddResource):
     @property
     def name(self):
         return self._data['package']
+
+    _tags = None
+    @property
+    def tags(self):
+        """The debtags associated with this package.
+        """
+        if self._tags is None:
+            self._tags = self._fetch_linked('', 'tag',
+                    base_table_name='debtags')
+        return self._tags
 
     def get_subpackages(self, **kwargs):
         """Get all subpackages matching the criterions.
