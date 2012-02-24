@@ -537,7 +537,7 @@ class SubPackage(UddResource):
             'python_version', 'provides', 'conflicts', 'sha256',
             'original_maintainer', 'distribution', 'release', 'component',
             'ruby_versions')
-    _computed_fields = ('descriptions',)
+    _computed_fields = ('descriptions', 'lintian')
 
     _descriptions = None
     @property
@@ -553,6 +553,24 @@ class SubPackage(UddResource):
                                                'md5sum': x[3]},
                                        ) for x in descriptions])
         return self._descriptions
+
+    _lintian = None
+    @property
+    def lintian(self):
+        """Lintian data for this package.
+        """
+        if self._lintian is None:
+            lintian = self._fetch_linked('', 
+                    ('package_type', 'tag', 'information',
+                    'package_arch', 'package_version'),
+                    base_table_name='lintian',
+                    exclude_from_pk=('distribution', 'release', 'component',
+                                     'architecture', 'version'))
+            lintian = [dict(zip(['type', 'tag', 'information'], x))
+                       for x in lintian
+                       if x[3:] == (self.architecture, self.version)]
+            self._lintian = lintian
+        return self._lintian
 
 
 
