@@ -467,6 +467,8 @@ class Developper(UddResource):
 
 class Package(UddResource):
     """A Debian package.
+    This resource has no representation in the UDD, it is created using
+    DISTINCT(package) from the subpackages list. 
     """
     _path = 'packages'
     _fields = ('package',)

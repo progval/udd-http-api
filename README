@@ -19,11 +19,21 @@ the web server:
 URL schema
 ==========
 
-The root gives the list of available subdirectories.
+The root gives the list of available subdirectories. For example :
+http://udd.progval.net/bugs/
 
 You can provide filters (by appending ?filter1=value1&filter2=value2) to the
 URL. filter1 and filter2 are names of fields of the resources.
 Giving the same filter twice will be ignored.
+
+Self-documentation
+==================
+
+As content are generated dynamically, it is possible for the API to display doc
+about itself. You just have to append /doc/ to a resource path to get a
+description of its fields.
+
+For example : http://udd.progval.net/bugs/doc/
 
 Format
 ======

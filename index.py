@@ -59,6 +59,7 @@ def application(environ, start_response):
             (x.__name__, {'path': x._path, 'doc': x.__doc__.strip(),})
             for x in uddlib.UddResource.__subclasses__()])
         data = {'info': 'This is a JSON API for the Ultimate Debian Database.',
+                'doc': 'https://github.com/ProgVal/udd-http-api/blob/master/README',
                 'resources': resources}
         start_response('200 OK', [('Content-type', 'application/json')])
         return [serialize(data)]
@@ -76,10 +77,16 @@ def application(environ, start_response):
 
         # We want {'key': 'value'} and not {'key': ['value']}
         filters = dict([(x,y[0]) for x,y in filters.items()])
-        
+
         obj = cls.fetch_database(**filters)
         start_response('200 OK', [('Content-type', 'application/json')])
         if isinstance(obj, list):
             return [serialize([x.data for x in obj])]
         else:
             return [serialize(obj.data)]
+    elif len(url) == 2 and url[1] == 'doc':
+        start_response('200 OK', [('Content-type', 'application/json')])
+        doc = {'computed fields': dict([(x, getattr(cls, x).__doc__)
+                                   for x in (cls._computed_fields)]),
+               'fields from database': cls._fields}
+        return [serialize(doc)]
