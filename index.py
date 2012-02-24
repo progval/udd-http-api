@@ -51,13 +51,20 @@ def dthandler(obj):
 def serialize(data):
     return json.dumps(data, sort_keys=True, indent=4, default=dthandler)
 
+def get_subclasses(cls):
+    subclasses = []
+    subclasses = cls.__subclasses__()
+    for subclass in cls.__subclasses__():
+        subclasses.extend(get_subclasses(subclass))
+    return subclasses
+
 def application(environ, start_response):
     url = [x for x in environ['PATH_INFO'].split('/') if x != '']
 
     if len(url) == 0: # Return list of resources
         resources = dict([
-            (x.__name__, {'path': x._path, 'doc': x.__doc__.strip(),})
-            for x in uddlib.UddResource.__subclasses__()])
+            (x.__name__, {'path': x._path, 'doc': (x.__doc__ or '').strip(),})
+            for x in get_subclasses(uddlib.UddResource)])
         data = {'info': 'This is a JSON API for the Ultimate Debian Database.',
                 'doc': 'https://github.com/ProgVal/udd-http-api/blob/master/README',
                 'resources': resources}
