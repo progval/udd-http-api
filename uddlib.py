@@ -350,6 +350,7 @@ class Bug(UddResource):
 
     @property
     def archived(self):
+        """Determines whether or not this bug is archived or not."""
         return ('bugs' not in self._table)
 
     _blocks = None
@@ -396,7 +397,7 @@ class Bug(UddResource):
     _tags = None
     @property
     def tags(self):
-        """The version this bug has been found in."""
+        """The tags of this bug"""
         if self._tags is None:
             self._tags = self._fetch_linked('tags', 'tag')
         return self._tags
@@ -404,7 +405,8 @@ class Bug(UddResource):
     _usertags = None
     @property
     def usertags(self):
-        """The version this bug has been found in."""
+        """The tags defined by users on this bug. This property is only
+        available if this bug is not archived."""
         if self._usertags is None:
             if self.archived:
                 print repr(self._table)
