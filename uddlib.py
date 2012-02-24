@@ -48,7 +48,7 @@ class CorruptedDatabase(UddException):
     """
     pass
 
-def data2object(cls, data):
+def data2object(cls, data, table=None):
     """Shortcut for creating an object from database data.
 
     :param cls: The class of the object
@@ -57,7 +57,7 @@ def data2object(cls, data):
     """
     assert len(cls._fields) == len(data)
     kwargs = dict(zip(cls._fields, data))
-    return cls(**kwargs)
+    return cls(_table=table, **kwargs)
 
 class UddResource(object):
     """Base class representing an entry in the database.
@@ -81,11 +81,13 @@ class UddResource(object):
             cls.__instances[cls][id] = instance
         return cls.__instances[cls][id]
 
-    def __init__(self, **kwargs):
+    def __init__(self, _table=None, **kwargs):
         assert self._path is not None
         assert self._table is not None
         assert self._fields is not None
         self._data = kwargs
+        if _table is not None:
+            self._table = _table
 
     def __getattr__(self, name):
         if name in self.__dict__:
@@ -224,7 +226,7 @@ class UddResource(object):
                     data = cur.fetchone()
                     if data is None:
                         break
-                    objects.append(data2object(cls, data))
+                    objects.append(data2object(cls, data, (table,)))
             finally:
                 cur.close()
 
@@ -244,7 +246,7 @@ class UddResource(object):
                 if data is None:
                     raise ObjectNotFound()
                 else:
-                    return data2object(cls, data)
+                    return data2object(cls, data, (table,))
             finally:
                 cur.close()
 
@@ -333,6 +335,7 @@ class UddResource(object):
 class Bug(UddResource):
     """Base class for active and inactive bugs.
     """
+    _pk = ('id',)
     _fields = ('id', 'package', 'source', 'arrival', 'status', 'severity',
     'submitter', 'owner', 'done', 'title', 'last_modified', 'forwarded',
     'affects_stable', 'affects_testing', 'affects_unstable',
@@ -340,10 +343,14 @@ class Bug(UddResource):
     'owner_email', 'done_name', 'done_email', 'affects_oldstable',
     'done_date')
     _computed_fields = ('blocks', 'blockedby', 'merged_with', 'fixed_in',
-    'found_in', 'tags', 'packages')
+    'found_in', 'tags', 'usertags', 'packages', 'archived')
 
     _path = 'bugs'
     _table = ('bugs', 'archived_bugs')
+
+    @property
+    def archived(self):
+        return ('bugs' not in self._table)
 
     _blocks = None
     @property
@@ -394,6 +401,19 @@ class Bug(UddResource):
             self._tags = self._fetch_linked('tags', 'tag')
         return self._tags
 
+    _usertags = None
+    @property
+    def usertags(self):
+        """The version this bug has been found in."""
+        if self._usertags is None:
+            if self.archived:
+                print repr(self._table)
+                # Archived bugs have to usertags.
+                self._usertags = []
+            else:
+                self._usertags = self._fetch_linked('usertags', ('email', 'tag'))
+        return self._tags
+
     _packages = None
     @property
     def packages(self):
@@ -409,8 +429,9 @@ class Bug(UddResource):
 class Developper(UddResource):
     """A Debian Developper, from the Carnivore database.
     """
+    _pk = ('id',)
     _path = 'developpers'
-    _table = 'carnivore_login'
+    _table = ('carnivore_login',)
     _fields = ('id', 'login')
     _computed_fields = ('emails', 'keys', 'names')
 
