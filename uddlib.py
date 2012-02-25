@@ -586,7 +586,8 @@ class SubPackage(UddResource):
 
 
 class Popcon(UddResource):
-    """Popularity contest."""
+    """Popularity contest.
+    """
     _path = 'popcon'
     _table = 'popcon'
     _fields = ['package', 'insts', 'vote', 'olde', 'recent', 'nofiles']
@@ -598,3 +599,39 @@ class PopconSrc(Popcon):
 class PopconSrcAverage(Popcon):
     _path = 'popcon_src_average'
     _table = 'popcon_src_average'
+
+
+class Source(UddResource):
+    """A source package.
+    """
+    _path = 'sources'
+    _table = 'sources'
+    _pk = ('source', 'version', 'distribution', 'release')
+    _fields = ('source', 'version', 'maintainer', 'maintainer_name',
+            'maintainer_email', 'format', 'files', 'uploaders', 'bin',
+            'artchitecture', 'standards_version', 'homepage', 'build_depends',
+            'build_depends_indep', 'build_conflicts', 'build_conflicts_indep',
+            'priority', 'section', 'distribution', 'release', 'componenet',
+            'vcs_type', 'vcs_url', 'vcs_browser', 'python_version',
+            'checksums_sha1', 'checksums_sha256', 'original_maintainer',
+            'dm_upload_allowed', 'ruby_versions')
+    _computed_fields = ('uploaders',)
+
+    _uploaders = None
+    @property
+    def uploaders(self):
+        """People who can upload a new source package.
+        """
+        if self._uploaders is None:
+            self._uploaders = self._fetch_linked('', ('uploader', 'name', 'email'),
+                    base_table_name='uploaders')
+        return self._uploaders
+
+class Uploader(UddResource):
+    """Source packages uploaders.
+    """
+    _path = 'uploaders'
+    _table = ('uploaders',)
+    _fields = ('source', 'version', 'distribution', 'release', 'component',
+            'uploader', 'name', 'email')
+    _pk = _fields
