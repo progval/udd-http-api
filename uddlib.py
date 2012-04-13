@@ -432,7 +432,7 @@ class Developper(UddResource):
     """A Debian Developper, from the Carnivore database.
     """
     _pk = ('id',)
-    _path = 'developpers'
+    _path = 'developers'
     _table = ('carnivore_login',)
     _fields = ('id', 'login')
     _computed_fields = ('emails', 'keys', 'names')
@@ -440,7 +440,7 @@ class Developper(UddResource):
     _emails = None
     @property
     def emails(self):
-        """The email addresses of this developper."""
+        """The email addresses of this developer."""
         if self._emails is None:
             self._emails = self._fetch_linked('emails', 'email',
                     base_table_name='carnivore_')
@@ -449,7 +449,7 @@ class Developper(UddResource):
     _keys = None
     @property
     def keys(self):
-        """The key of this developper.
+        """The key of this developer.
         A list of tuples (key, key_type)."""
         if self._keys is None:
             self._keys = self._fetch_linked('keys', ('key', 'key_type'),
@@ -459,7 +459,7 @@ class Developper(UddResource):
     _names = None
     @property
     def names(self):
-        """The names of this developper.
+        """The names of this developer.
         """
         if self._names is None:
             self._names = self._fetch_linked('names', 'name',
