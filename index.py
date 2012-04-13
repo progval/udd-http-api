@@ -71,6 +71,10 @@ def application(environ, start_response):
         start_response('200 OK', [('Content-type', 'application/json')])
         return [serialize(data)]
 
+    if url[0] == 'robots.txt':
+        start_response('200 OK', [('Content-type', 'text/plain')])
+        return ['User-agent: *\nDisallow: /']
+
     
     try:
         cls = uddlib.UddResource.resolve_path(url[0])
