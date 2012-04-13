@@ -183,8 +183,8 @@ class UddResource(object):
         """
         table = _table or cls._table
         if isinstance(table, tuple):
+            results = []
             if pk is None:
-                results = []
                 for table in table:
                     try:
                         results.extend(cls.fetch_database(pk, fields, table,
